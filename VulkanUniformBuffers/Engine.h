@@ -1,11 +1,15 @@
 #pragma once
 
+#define GLM_FORCE_RADIANS
+
 #include <vulkan.h>
 #include <optional>
 #include <vector>
 #include <array>
 #include "glm/common.hpp"
 #include "glm/vec3.hpp"
+#include "glm/mat4x4.hpp"
+#include <chrono>
 
 struct QueueFamilyIndices
 {
@@ -24,6 +28,13 @@ struct Vertex
 {
 	glm::vec3 position;
 	glm::vec3 color;
+};
+
+struct UniformBufferObject
+{
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 projection;
 };
 
 class Engine
@@ -61,6 +72,18 @@ private:
 	std::vector<uint32_t> m_indices;
 	VkBuffer m_vkIndexBuffer;
 	VkDeviceMemory m_vkIndexDeviceMemory;
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
+	std::vector<VkBuffer> m_vkUniformBuffers;
+	std::vector<VkDeviceMemory> m_vkUniformDeviceMemory;
+
+	glm::vec3 m_modelPosition;
+	glm::vec3 m_modelRotation;
+	glm::vec3 m_modelScale;
+	UniformBufferObject m_uniformBufferObject;
+	VkDescriptorPool m_vkUniformDescriptorPool;
+	std::vector<VkDescriptorSet> m_vkUniformDescriptorSets;
+
+	std::chrono::high_resolution_clock::time_point prevTime;
 
 	void initVkInstance();
 	void createVkSurface();
@@ -69,8 +92,12 @@ private:
 	void createSwapChain();
 	void createSwapChainImageViews();
 	void createRenderPass();
+	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
 	void createFramebuffers();
+	void createUniformBuffers();
+	void createDescriptorPool();
+	void createDescriptorSets();
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags,
 		VkBuffer* outBuffer, VkDeviceMemory* outDeviceMemory);
@@ -83,6 +110,10 @@ private:
 	void createCommandBuffers();
 	void createSemaphores();
 	void createFences();
+
+	void initScene();
+	void updateUniformBuffer(uint32_t imageIndex);
+	void updateUniformBufferObject(float deltaSec);
 
 	VkShaderModule loadShader(const char* fileName);
 	QueueFamilyIndices findQueueFamilyIndices(VkPhysicalDevice physicalDevice);
