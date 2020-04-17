@@ -31,16 +31,19 @@ int main(int argc, char* args[])
 	{
 		if (SDL_PollEvent(&sdlEvent))
 		{
-			if (sdlEvent.type == SDL_WINDOWEVENT)
+			switch (sdlEvent.type)
 			{
-				switch (sdlEvent.window.event)
+			case SDL_WINDOWEVENT:
+				if (sdlEvent.window.event == SDL_WINDOWEVENT_CLOSE)
 				{
-				case SDL_WINDOWEVENT_CLOSE:
 					running = false;
-					break;
 				}
+				break;
+			default:
+				engine.readInput(sdlEvent);
 			}
 		}
+		
 
 		engine.update();
 		engine.render();

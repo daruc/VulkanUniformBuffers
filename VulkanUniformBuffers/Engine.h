@@ -10,6 +10,7 @@
 #include "glm/vec3.hpp"
 #include "glm/mat4x4.hpp"
 #include <chrono>
+#include "SDL.h"
 
 struct QueueFamilyIndices
 {
@@ -35,6 +36,17 @@ struct UniformBufferObject
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 projection;
+};
+
+struct InputState
+{
+	bool forward;
+	bool backward;
+	bool left;
+	bool right;
+	Sint32 mouseXRel;
+	Sint32 mouseYRel;
+	bool mouseRight;
 };
 
 class Engine
@@ -76,14 +88,14 @@ private:
 	std::vector<VkBuffer> m_vkUniformBuffers;
 	std::vector<VkDeviceMemory> m_vkUniformDeviceMemory;
 
-	glm::vec3 m_modelPosition;
-	glm::vec3 m_modelRotation;
-	glm::vec3 m_modelScale;
+	glm::vec3 m_viewPosition;
+	glm::vec3 m_viewRotation;
 	UniformBufferObject m_uniformBufferObject;
 	VkDescriptorPool m_vkUniformDescriptorPool;
 	std::vector<VkDescriptorSet> m_vkUniformDescriptorSets;
 
-	std::chrono::high_resolution_clock::time_point prevTime;
+	std::chrono::high_resolution_clock::time_point m_prevTime;
+	InputState m_inputState;
 
 	void initVkInstance();
 	void createVkSurface();
@@ -128,11 +140,16 @@ private:
 	bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice);
 	bool checkSwapchainSupport(VkPhysicalDevice physicalDevice);
 	bool checkQueueFamiliesSupport(VkPhysicalDevice physicalDevice);
+
+	void readMouseButton(bool down, Uint8 button);
+	void readMouseMotion(Sint16 xRel, Sint16 yRel);
+	void readKey(bool down, SDL_Keycode key);
 	
 public:
 	Engine();
 
 	void init(struct SDL_Window* sdlWindow);
+	void readInput(const SDL_Event& sdlEvent);
 	void update();
 	void render();
 	void cleanUp();

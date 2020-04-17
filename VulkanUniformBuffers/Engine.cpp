@@ -808,17 +808,14 @@ void Engine::createFences()
 
 void Engine::initScene()
 {
-	prevTime = std::chrono::high_resolution_clock::now();
-	m_modelPosition = { 0.0f, 0.0f, 0.0f };
-	m_modelRotation = { 0.0f, 0.0f, 0.0f };
-	m_modelScale = { 1.0f, 1.0f, 1.0f };
+	m_prevTime = std::chrono::high_resolution_clock::now();
+	m_uniformBufferObject.model = glm::mat4(1.0f);
 
-	m_uniformBufferObject.model = glm::translate(glm::mat4(1.0f), m_modelPosition);
+	m_viewPosition = { 0.0f, 0.0f, 2.0f };
+	m_viewRotation = { 0.0f, 0.0f, 0.0f };
 
-	glm::vec3 eye(2.0f, 2.0f, 2.0f);
-	glm::vec3 target(0.0f, 0.0f, 0.0f);
-	glm::vec3 up(0.0f, 0.0f, 1.0f);
-	m_uniformBufferObject.view = glm::lookAt(eye, target, up);
+	glm::mat4 viewTranslationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
+	m_uniformBufferObject.view = glm::inverse(viewTranslationMat);
 
 	float aspectRatio = m_vkSwapchainExtent.width / static_cast<float>(m_vkSwapchainExtent.height);
 	m_uniformBufferObject.projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
@@ -836,8 +833,91 @@ void Engine::updateUniformBuffer(uint32_t imageIndex)
 
 void Engine::updateUniformBufferObject(float deltaSec)
 {
-	float deltaRadians = deltaSec / 2.0f;
-	m_uniformBufferObject.model = glm::rotate(m_uniformBufferObject.model, deltaRadians, glm::vec3(0.0f, 0.0f, 1.0f));
+	const float speed = 1.0f;
+	const glm::vec3 xUnit(1.0f, 0.0f, 0.0f);
+	const glm::vec3 yUnit(0.0f, 1.0f, 0.0f);
+	const glm::vec3 zUnit(0.0f, 0.0f, 1.0f);
+
+	if (m_inputState.left)
+	{
+		glm::mat4 viewRotationMat(1.0f);
+
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+
+		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
+		glm::vec3 translationVec = -rightVec * speed * deltaSec;
+
+		m_viewPosition += translationVec;
+		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
+	}
+
+	if (m_inputState.right)
+	{
+		glm::mat4 viewRotationMat(1.0f);
+
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+
+		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
+		glm::vec3 translationVec = rightVec * speed * deltaSec;
+
+		m_viewPosition += translationVec;
+		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
+	}
+
+	if (m_inputState.forward)
+	{
+		glm::mat4 viewRotationMat(1.0f);
+
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+
+		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
+		glm::vec3 translationVec = forwardVec * speed * deltaSec;
+
+		m_viewPosition += translationVec;
+		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
+	}
+
+	if (m_inputState.backward)
+	{
+		glm::mat4 viewRotationMat(1.0f);
+
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+
+		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
+		glm::vec3 translationVec = -forwardVec * speed * deltaSec;
+
+		m_viewPosition += translationVec;
+		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
+	}
+
+	if (m_inputState.mouseRight)
+	{
+		const float angleSpeed = 0.01f;
+		float xAngle = -static_cast<float>(m_inputState.mouseYRel) * angleSpeed;
+		float yAngle = -static_cast<float>(m_inputState.mouseXRel) * angleSpeed;
+		m_viewRotation.x += xAngle;
+		m_viewRotation.y += yAngle;
+
+		glm::mat4 rotationMat(1.0f);
+		rotationMat = glm::rotate(rotationMat, m_viewRotation.x, xUnit);
+		rotationMat = glm::rotate(rotationMat, m_viewRotation.y, yUnit);
+		rotationMat = glm::rotate(rotationMat, m_viewRotation.z, zUnit);
+
+		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
+
+		m_uniformBufferObject.view = glm::inverse(translationMat * rotationMat);
+	}
+
+	m_inputState.mouseXRel = 0;
+	m_inputState.mouseYRel = 0;
 }
 
 VkVertexInputBindingDescription Engine::buildVertexBindingDescription()
@@ -1043,6 +1123,41 @@ bool Engine::checkQueueFamiliesSupport(VkPhysicalDevice physicalDevice)
 	return indices.graphics.has_value() && indices.presentation.has_value();
 }
 
+void Engine::readMouseButton(bool down, Uint8 button)
+{
+	switch (button)
+	{
+	case SDL_BUTTON_RIGHT:
+		m_inputState.mouseRight = down;
+		break;
+	}
+}
+
+void Engine::readMouseMotion(Sint16 xRel, Sint16 yRel)
+{
+	m_inputState.mouseXRel = xRel;
+	m_inputState.mouseYRel = yRel;
+}
+
+void Engine::readKey(bool down, SDL_Keycode key)
+{
+	switch (key)
+	{
+	case SDLK_a:
+		m_inputState.left = down;
+		break;
+	case SDLK_d:
+		m_inputState.right = down;
+		break;
+	case SDLK_w:
+		m_inputState.forward = down;
+		break;
+	case SDLK_s:
+		m_inputState.backward = down;
+		break;
+	}
+}
+
 Engine::Engine()
 	: MAX_FRAMES_IN_FLIGHT(2)
 {
@@ -1052,6 +1167,8 @@ void Engine::init(SDL_Window* sdlWindow)
 {
 	m_sdlWindow = sdlWindow;
 	m_currentFrame = 0;
+
+	m_inputState = {};
 
 	initVkInstance();
 	createVkSurface();
@@ -1076,13 +1193,35 @@ void Engine::init(SDL_Window* sdlWindow)
 	initScene();
 }
 
+void Engine::readInput(const SDL_Event& sdlEvent)
+{
+	switch (sdlEvent.type)
+	{
+	case SDL_MOUSEBUTTONDOWN:
+		readMouseButton(true, sdlEvent.button.button);
+		break;
+	case SDL_MOUSEBUTTONUP:
+		readMouseButton(false, sdlEvent.button.button);
+		break;
+	case SDL_KEYDOWN:
+		readKey(true, sdlEvent.key.keysym.sym);
+		break;
+	case SDL_KEYUP:
+		readKey(false, sdlEvent.key.keysym.sym);
+		break;
+	case SDL_MOUSEMOTION:
+		readMouseMotion(sdlEvent.motion.xrel, sdlEvent.motion.yrel);
+		break;
+	}
+}
+
 void Engine::update()
 {
 	using namespace std::chrono;
 
 	time_point currentTime = high_resolution_clock::now();
-	float deltaSec = duration<float>(currentTime - prevTime).count();
-	prevTime = currentTime;
+	float deltaSec = duration<float>(currentTime - m_prevTime).count();
+	m_prevTime = currentTime;
 	updateUniformBufferObject(deltaSec);
 }
 
