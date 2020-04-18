@@ -7,7 +7,7 @@ int main(int argc, char* args[])
 	SDL_Init(SDL_INIT_VIDEO);
 
 	SDL_Window* window = SDL_CreateWindow(
-		"Vulkan Initialization",
+		"Vulkan Uniform Buffers",
 		SDL_WINDOWPOS_UNDEFINED,	// x
 		SDL_WINDOWPOS_UNDEFINED,	// y
 		800,	// width

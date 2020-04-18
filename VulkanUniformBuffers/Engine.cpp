@@ -599,19 +599,31 @@ void Engine::copyBuffer(VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffe
 
 void Engine::createVertexBuffer()
 {
-	m_vertices.resize(4);
+	m_vertices.resize(8);
 
 	m_vertices[0].color = { 1.0f, 0.0f, 0.0f };
-	m_vertices[0].position = { -0.5f, -0.5f, 0.0f };
+	m_vertices[0].position = { -0.5f, -0.5f, 0.5f };
 	
 	m_vertices[1].color = { 0.0f, 1.0f, 0.0f };
-	m_vertices[1].position = { 0.5f, -0.5f, 0.0f };
+	m_vertices[1].position = { 0.5f, -0.5f, 0.5f };
 	
 	m_vertices[2].color = { 0.0f, 0.0f, 1.0f };
-	m_vertices[2].position = { 0.5f, 0.5f, 0.0f };
+	m_vertices[2].position = { 0.5f, 0.5f, 0.5f };
 
 	m_vertices[3].color = { 1.0f, 0.0f, 1.0f };
-	m_vertices[3].position = { -0.5f, 0.5f, 0.0f };
+	m_vertices[3].position = { -0.5f, 0.5f, 0.5f };
+
+	m_vertices[4].color = { 1.0f, 0.0f, 0.0f };
+	m_vertices[4].position = { -0.5f, -0.5f, -0.5f };
+
+	m_vertices[5].color = { 0.0f, 1.0f, 0.0f };
+	m_vertices[5].position = { 0.5f, -0.5f, -0.5f };
+
+	m_vertices[6].color = { 0.0f, 0.0f, 1.0f };
+	m_vertices[6].position = { 0.5f, 0.5f, -0.5f };
+
+	m_vertices[7].color = { 1.0f, 0.0f, 1.0f };
+	m_vertices[7].position = { -0.5f, 0.5f, -0.5f };
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
@@ -649,7 +661,13 @@ void Engine::createVertexBuffer()
 
 void Engine::createIndexBuffer()
 {
-	m_indices = { 0, 1, 2, 0, 2, 3 };
+	m_indices = { 0, 1, 2, 0, 2, 3, // front
+				7, 6, 4, 6, 5, 4, // back
+				1, 5, 6, 1, 6, 2,	// right
+				4, 0, 3, 4, 3, 7,	// left
+				4, 5, 1, 4, 1, 0,	// top
+				2, 6, 7, 2, 7, 3	// bottom
+	};
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
 
@@ -819,7 +837,8 @@ void Engine::initScene()
 
 	float aspectRatio = m_vkSwapchainExtent.width / static_cast<float>(m_vkSwapchainExtent.height);
 	m_uniformBufferObject.projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
-	m_uniformBufferObject.projection[1][1] *= -1.0f;
+	m_uniformBufferObject.projection =
+		glm::scale(m_uniformBufferObject.projection, glm::vec3(1.0, -1.0f, 1.0f));
 }
 
 void Engine::updateUniformBuffer(uint32_t imageIndex)
@@ -842,24 +861,24 @@ void Engine::updateUniformBufferObject(float deltaSec)
 	{
 		glm::mat4 viewRotationMat(1.0f);
 
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 
 		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
 		glm::vec3 translationVec = -rightVec * speed * deltaSec;
 
 		m_viewPosition += translationVec;
-		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
+
+		glm::mat4 viewTranslationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
+		m_uniformBufferObject.view = glm::inverse(viewTranslationMat * viewRotationMat);
 	}
 
 	if (m_inputState.right)
 	{
 		glm::mat4 viewRotationMat(1.0f);
 
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 
 		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
 		glm::vec3 translationVec = rightVec * speed * deltaSec;
@@ -872,9 +891,8 @@ void Engine::updateUniformBufferObject(float deltaSec)
 	{
 		glm::mat4 viewRotationMat(1.0f);
 
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 
 		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
 		glm::vec3 translationVec = forwardVec * speed * deltaSec;
@@ -887,9 +905,8 @@ void Engine::updateUniformBufferObject(float deltaSec)
 	{
 		glm::mat4 viewRotationMat(1.0f);
 
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.z, zUnit);
+		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
 
 		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
 		glm::vec3 translationVec = -forwardVec * speed * deltaSec;
@@ -907,9 +924,8 @@ void Engine::updateUniformBufferObject(float deltaSec)
 		m_viewRotation.y += yAngle;
 
 		glm::mat4 rotationMat(1.0f);
-		rotationMat = glm::rotate(rotationMat, m_viewRotation.x, xUnit);
 		rotationMat = glm::rotate(rotationMat, m_viewRotation.y, yUnit);
-		rotationMat = glm::rotate(rotationMat, m_viewRotation.z, zUnit);
+		rotationMat = glm::rotate(rotationMat, m_viewRotation.x, xUnit);
 
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
 
