@@ -98,6 +98,10 @@ private:
 	std::chrono::high_resolution_clock::time_point m_prevTime;
 	InputState m_inputState;
 
+	VkImage m_vkDepthImage;
+	VkDeviceMemory m_vkDepthMemory;
+	VkImageView m_vkDepthImageView;
+
 	void initVkInstance();
 	void createVkSurface();
 	void pickPhysicalDevice();
@@ -123,6 +127,7 @@ private:
 	void createCommandBuffers();
 	void createSemaphores();
 	void createFences();
+	void createDepthResources();
 
 	void initScene();
 	void updateUniformBuffer(uint32_t imageIndex);
@@ -137,6 +142,10 @@ private:
 	VkVertexInputBindingDescription buildVertexBindingDescription();
 	std::array<VkVertexInputAttributeDescription, 2> buildVertexAttributeDescription();
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+		VkFormatFeatureFlags features);
+	VkFormat findDepthFormat();
+	bool hasStencilComponent(VkFormat format);
 
 	bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice);
 	bool checkSwapchainSupport(VkPhysicalDevice physicalDevice);
