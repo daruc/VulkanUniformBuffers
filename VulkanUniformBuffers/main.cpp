@@ -1,57 +1,14 @@
-#include "SDL.h"
+#define _DISABLE_EXTENDED_ALIGNED_STORAGE
+
+#include <memory>
 #include "Engine.h"
-#include <iostream>
+#include "SdlWindow.h"
+
 
 int main(int argc, char* args[]) 
 {
-	SDL_Init(SDL_INIT_VIDEO);
-
-	SDL_Window* window = SDL_CreateWindow(
-		"Vulkan Uniform Buffers",
-		SDL_WINDOWPOS_UNDEFINED,	// x
-		SDL_WINDOWPOS_UNDEFINED,	// y
-		800,	// width
-		600,	// height
-		SDL_WINDOW_VULKAN
-	);
-
-	if (!window)
-	{
-		std::cerr << "Cannot create SDL window!" << std::endl;
-		exit(-1);
-	}
-
-	Engine engine;
-	engine.init(window);
-
-	SDL_Event sdlEvent;
-	bool running = true;
-
-	while (running)
-	{
-		if (SDL_PollEvent(&sdlEvent))
-		{
-			switch (sdlEvent.type)
-			{
-			case SDL_WINDOWEVENT:
-				if (sdlEvent.window.event == SDL_WINDOWEVENT_CLOSE)
-				{
-					running = false;
-				}
-				break;
-			default:
-				engine.readInput(sdlEvent);
-			}
-		}
-		
-
-		engine.update();
-		engine.render();
-	}
-
-	engine.cleanUp();
-	SDL_DestroyWindow(window);
-
-	SDL_Quit();
+	auto engine = std::make_shared<Engine>();
+	SdlWindow sdlWindow(engine);
+	sdlWindow.runMainLoop();
 	return 0;
 }
