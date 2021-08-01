@@ -21,7 +21,6 @@ private:
 	VkInstance vkInstance;
 
 	VkApplicationInfo buildVkApplicationInfo() const;
-	VkInstanceCreateInfo buildVkInstanceCreateInfo() const;
 	std::vector<const char*> buildExtensions(SDL_Window* sdlWindow, std::vector<const char*>* outExtensions) const;
 	VkInstanceCreateInfo buildVkInstanceCreateInfo(SDL_Window* sdlWindow, VkApplicationInfo* vkApplicationInfo);
 	void addValidationLayers(VkInstanceCreateInfo* outVkInstanceCreateInfo);

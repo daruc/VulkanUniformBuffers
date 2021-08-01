@@ -41,25 +41,28 @@ struct InputState
 	bool mouseRight;
 };
 
+
+class VulkanInstance;
+class VulkanSurface;
+class PhysicalDevice;
+class Device;
+class SwapChain;
+class RenderPass;
+
+
 class Engine
 {
 private:
 	const int MAX_FRAMES_IN_FLIGHT;
 
 	struct SDL_Window* sdlWindow;
-	std::shared_ptr<class VulkanInstance> vulkanInstance;
-	std::shared_ptr<class VulkanSurface> vulkanSurface;
-	std::shared_ptr<class PhysicalDevice> physicalDevice;
+	std::shared_ptr<VulkanInstance> vulkanInstance;
+	std::shared_ptr<VulkanSurface> vulkanSurface;
+	std::shared_ptr<PhysicalDevice> physicalDevice;
+	std::shared_ptr<Device> device;
+	std::shared_ptr<SwapChain> swapChain;
+	std::shared_ptr<RenderPass> renderPass;
 
-	VkDevice m_vkDevice;
-	VkQueue m_vkGraphicsQueue;
-	VkQueue m_vkPresentationQueue;
-	VkSwapchainKHR m_vkSwapchain;
-	std::vector<VkImage> m_vkSwapchainImages;
-	std::vector<VkImageView> m_vkSwapchainImageViews;
-	VkFormat m_vkSwapchainImageFormat;
-	VkExtent2D m_vkSwapchainExtent;
-	VkRenderPass m_vkRenderPass;
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
 	std::vector<VkFramebuffer> m_vkSwapchainFramebuffers;
@@ -98,7 +101,6 @@ private:
 	void pickPhysicalDevice();
 	void createDevice();
 	void createSwapChain();
-	void createSwapChainImageViews();
 	void createRenderPass();
 	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
