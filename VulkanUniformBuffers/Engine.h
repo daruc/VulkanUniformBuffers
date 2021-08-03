@@ -8,20 +8,15 @@
 #include <vector>
 #include <array>
 #include "glm/common.hpp"
-#include "glm/vec3.hpp"
+
 #include "glm/mat4x4.hpp"
 #include <chrono>
 #include "SDL.h"
 #include <memory>
 #include "SwapChainSupportDetails.h"
 #include "QueueFamilyIndices.h"
+#include "Vertex.h"
 
-
-struct Vertex
-{
-	glm::vec3 position;
-	glm::vec3 color;
-};
 
 struct UniformBufferObject
 {
@@ -48,6 +43,8 @@ class PhysicalDevice;
 class Device;
 class SwapChain;
 class RenderPass;
+class DescriptorSetLayout;
+class GraphicsPipeline;
 
 
 class Engine
@@ -62,9 +59,9 @@ private:
 	std::shared_ptr<Device> device;
 	std::shared_ptr<SwapChain> swapChain;
 	std::shared_ptr<RenderPass> renderPass;
+	std::shared_ptr<DescriptorSetLayout> descriptorSetLayout;
+	std::shared_ptr<GraphicsPipeline> graphicsPipeline;
 
-	VkPipelineLayout m_vkPipelineLayout;
-	VkPipeline m_vkPipeline;
 	std::vector<VkFramebuffer> m_vkSwapchainFramebuffers;
 	VkCommandPool m_vkCommandPool;
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -79,7 +76,6 @@ private:
 	std::vector<uint32_t> m_indices;
 	VkBuffer m_vkIndexBuffer;
 	VkDeviceMemory m_vkIndexDeviceMemory;
-	VkDescriptorSetLayout m_vkDescriptorSetLayout;
 	std::vector<VkBuffer> m_vkUniformBuffers;
 	std::vector<VkDeviceMemory> m_vkUniformDeviceMemory;
 
@@ -126,12 +122,9 @@ private:
 	void updateUniformBuffer(uint32_t imageIndex);
 	void updateUniformBufferObject(float deltaSec);
 
-	VkShaderModule loadShader(const char* fileName);
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& presentModes);
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-	VkVertexInputBindingDescription buildVertexBindingDescription();
-	std::array<VkVertexInputAttributeDescription, 2> buildVertexAttributeDescription();
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
 		VkFormatFeatureFlags features);

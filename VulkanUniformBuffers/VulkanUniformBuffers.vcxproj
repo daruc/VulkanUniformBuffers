@@ -131,8 +131,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DescriptorSetLayout.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="GraphicsPipeline.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PhysicalDevice.cpp" />
     <ClCompile Include="RenderPass.cpp" />
@@ -142,14 +144,17 @@
     <ClCompile Include="VulkanSurface.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DescriptorSetLayout.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="Engine.h" />
+    <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="PhysicalDevice.h" />
     <ClInclude Include="QueueFamilyIndices.h" />
     <ClInclude Include="RenderPass.h" />
     <ClInclude Include="SdlWindow.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="SwapChainSupportDetails.h" />
+    <ClInclude Include="Vertex.h" />
     <ClInclude Include="VulkanInstance.h" />
     <ClInclude Include="VulkanSurface.h" />
   </ItemGroup>

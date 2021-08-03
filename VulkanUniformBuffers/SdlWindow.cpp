@@ -60,7 +60,7 @@ void SdlWindow::runMainLoop()
 
 void SdlWindow::dispatchSdlEventIfExist(SDL_Event* sdlEvent, bool* outRunning)
 {
-	if (SDL_PollEvent(sdlEvent))
+	while (SDL_PollEvent(sdlEvent))
 	{
 		dispatchSdlEvent(sdlEvent, outRunning);
 	}

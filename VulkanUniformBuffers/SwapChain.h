@@ -35,8 +35,8 @@ private:
 	uint32_t calculateImageCount(SwapChainSupportDetails* supportDetails) const;
 
 	VkSwapchainCreateInfoKHR createSwapChainCreateInfo(std::shared_ptr<PhysicalDevice> physicalDevice,
-		std::shared_ptr<VulkanSurface> vulkanSurface, uint32_t imageCount, VkSurfaceFormatKHR surfaceFormat, VkExtent2D extent,
-		SwapChainSupportDetails supportDetails, VkPresentModeKHR presentMode);
+		std::shared_ptr<VulkanSurface> vulkanSurface, uint32_t imageCount, VkSurfaceFormatKHR surfaceFormat,
+		VkExtent2D extent, SwapChainSupportDetails supportDetails, VkPresentModeKHR presentMode);
 
 	VkResult createSwapChain(std::shared_ptr<Device> device, VkSwapchainCreateInfoKHR* swapChainCreateInfo);
 	void throwIfCreationFailed(VkResult result) const;
