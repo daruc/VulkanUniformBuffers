@@ -45,6 +45,9 @@ class SwapChain;
 class RenderPass;
 class DescriptorSetLayout;
 class GraphicsPipeline;
+class Framebuffer;
+class CommandPool;
+class Depth;
 
 
 class Engine
@@ -61,9 +64,10 @@ private:
 	std::shared_ptr<RenderPass> renderPass;
 	std::shared_ptr<DescriptorSetLayout> descriptorSetLayout;
 	std::shared_ptr<GraphicsPipeline> graphicsPipeline;
+	std::shared_ptr<Framebuffer> framebuffer;
+	std::shared_ptr<CommandPool> commandPool;
+	std::shared_ptr<Depth> depth;
 
-	std::vector<VkFramebuffer> m_vkSwapchainFramebuffers;
-	VkCommandPool m_vkCommandPool;
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
 	std::vector<VkSemaphore> m_vkImageAvailableSemaphores;
 	std::vector<VkSemaphore> m_vkRenderFinishedSemaphores;
@@ -87,10 +91,6 @@ private:
 
 	std::chrono::high_resolution_clock::time_point m_prevTime;
 	InputState m_inputState;
-
-	VkImage m_vkDepthImage;
-	VkDeviceMemory m_vkDepthMemory;
-	VkImageView m_vkDepthImageView;
 
 	void initVkInstance();
 	void createVkSurface();
@@ -124,11 +124,6 @@ private:
 
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& presentModes);
-	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
-		VkFormatFeatureFlags features);
-	VkFormat findDepthFormat();
 	bool hasStencilComponent(VkFormat format);
 
 	void readMouseButton(bool down, Uint8 button);

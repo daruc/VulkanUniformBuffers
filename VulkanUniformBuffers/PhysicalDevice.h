@@ -34,12 +34,18 @@ private:
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physicalDevice) const;
 	bool checkQueueFamiliesSupport(VkPhysicalDevice physicalDevice);
 	QueueFamilyIndices findQueueFamilyIndices(VkPhysicalDevice physicalDevice);
-	void assignGraphicsOrPresentationIndex(VkQueueFamilyProperties queueFamily, VkPhysicalDevice physicalDevice, QueueFamilyIndices* queueFamilyIndices, unsigned int index);
+
+	void assignGraphicsOrPresentationIndex(VkQueueFamilyProperties queueFamily, VkPhysicalDevice physicalDevice,
+		QueueFamilyIndices* queueFamilyIndices, unsigned int index);
+
 	bool isGraphicsQueue(VkQueueFlags queueFlags) const;
 	void assignGraphicsIndexIfNotSet(QueueFamilyIndices* queueFamilyIndices, unsigned int index);
 	bool isGraphicsNotSet(QueueFamilyIndices queueFamilyIndices) const;
 	bool isPresentationNotSet(QueueFamilyIndices queueFamilyIndices) const;
-	void assignPresentationIndexIfSurfaceSupport(VkPhysicalDevice physicalDevice, QueueFamilyIndices* queueFamilyIndices, unsigned int index);
+
+	void assignPresentationIndexIfSurfaceSupport(VkPhysicalDevice physicalDevice, QueueFamilyIndices* queueFamilyIndices,
+		unsigned int index);
+
 	bool isSurfaceSupport(VkPhysicalDevice physicalDevice, int index, VkSurfaceKHR surface) const;
 	void throwQueueFamilyPropertiesNotFound() const;
 	bool areQueueFamiliesSet(QueueFamilyIndices queueFamilyIndices) const;
@@ -51,4 +57,9 @@ public:
 	SwapChainSupportDetails getSwapChainSupportDetails() const;
 	QueueFamilyIndices getQueueFamilyIndices() const;
 	VkPhysicalDevice getHandle() const;
+
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+		VkFormatFeatureFlags features) const;
+
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags) const;
 };

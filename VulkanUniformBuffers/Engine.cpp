@@ -14,6 +14,9 @@
 #include "RenderPass.h"
 #include "DescriptorSetLayout.h"
 #include "GraphicsPipeline.h"
+#include "Framebuffer.h"
+#include "CommandPool.h"
+#include "Depth.h"
 
 
 void Engine::initVkInstance()
@@ -58,31 +61,7 @@ void Engine::createGraphicsPipeline()
 
 void Engine::createFramebuffers()
 {
-	m_vkSwapchainFramebuffers.resize(swapChain->getSwapChainImageViews()->size());
-
-	VkFramebufferCreateInfo framebufferCreateInfo = {};
-	framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	framebufferCreateInfo.renderPass = renderPass->getHandle();
-	framebufferCreateInfo.attachmentCount = 2;
-	framebufferCreateInfo.width = swapChain->getSwapChainExtent().width;
-	framebufferCreateInfo.height = swapChain->getSwapChainExtent().height;
-	framebufferCreateInfo.layers = 1;
-
-	for (int i = 0; i < swapChain->getSwapChainImageViews()->size(); ++i)
-	{
-		std::array<VkImageView, 2> attachments = {
-			swapChain->getSwapChainImageViews()->at(i),
-			m_vkDepthImageView
-		};
-
-		framebufferCreateInfo.pAttachments = attachments.data();
-
-		VkResult result = vkCreateFramebuffer(device->getHandle(), &framebufferCreateInfo, nullptr, &m_vkSwapchainFramebuffers[i]);
-		if (result != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to create swap chain frame buffer.");
-		}
-	}
+	framebuffer = std::make_shared<Framebuffer>(device, swapChain, renderPass, depth->getImageViewHandle());
 }
 
 void Engine::createUniformBuffers()
@@ -180,7 +159,7 @@ void Engine::createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMe
 	VkMemoryAllocateInfo memoryAllocateInfo = {};
 	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memoryAllocateInfo.allocationSize = vertexBufferMemRequirements.size;
-	memoryAllocateInfo.memoryTypeIndex = findMemoryType(vertexBufferMemRequirements.memoryTypeBits,
+	memoryAllocateInfo.memoryTypeIndex = physicalDevice->findMemoryType(vertexBufferMemRequirements.memoryTypeBits,
 		propertyFlags);
 
 	result = vkAllocateMemory(device->getHandle(), &memoryAllocateInfo, nullptr, outDeviceMemory);
@@ -197,7 +176,7 @@ void Engine::copyBuffer(VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffe
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
 	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	commandBufferAllocateInfo.commandBufferCount = 1;
-	commandBufferAllocateInfo.commandPool = m_vkCommandPool;
+	commandBufferAllocateInfo.commandPool = commandPool->getHandle();
 	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
 	VkCommandBuffer commandBuffer;
@@ -222,7 +201,7 @@ void Engine::copyBuffer(VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffe
 
 	vkQueueSubmit(device->getGraphicsQueueHandle(), 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(device->getGraphicsQueueHandle());
-	vkFreeCommandBuffers(device->getHandle(), m_vkCommandPool, 1, &commandBuffer);
+	vkFreeCommandBuffers(device->getHandle(), commandPool->getHandle(), 1, &commandBuffer);
 }
 
 void Engine::createVertexBuffer()
@@ -332,26 +311,16 @@ void Engine::createIndexBuffer()
 
 void Engine::createCommandPool()
 {
-	QueueFamilyIndices queueFamilyIndices = physicalDevice->getQueueFamilyIndices();
-
-	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
-	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndices.graphics.value();
-
-	VkResult result = vkCreateCommandPool(device->getHandle(), &commandPoolCreateInfo, nullptr, &m_vkCommandPool);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create command pool.");
-	}
+	commandPool = std::make_shared<CommandPool>(physicalDevice, device);
 }
 
 void Engine::createCommandBuffers()
 {
-	m_vkCommandBuffers.resize(m_vkSwapchainFramebuffers.size());
+	m_vkCommandBuffers.resize(framebuffer->getCount());
 
 	VkCommandBufferAllocateInfo commandBufferInfo = {};
 	commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferInfo.commandPool = m_vkCommandPool;
+	commandBufferInfo.commandPool = commandPool->getHandle();
 	commandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	commandBufferInfo.commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers.size());
 
@@ -375,7 +344,7 @@ void Engine::createCommandBuffers()
 		VkRenderPassBeginInfo renderPassInfo = {};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassInfo.renderPass = renderPass->getHandle();
-		renderPassInfo.framebuffer = m_vkSwapchainFramebuffers[i];
+		renderPassInfo.framebuffer = framebuffer->getHandle(i);
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = swapChain->getSwapChainExtent();
 
@@ -454,65 +423,7 @@ void Engine::createFences()
 
 void Engine::createDepthResources()
 {
-	VkFormat format = findDepthFormat();
-	
-	VkImageCreateInfo imageInfo = {};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.format = format;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = swapChain->getSwapChainExtent().width;
-	imageInfo.extent.height = swapChain->getSwapChainExtent().height;
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	VkResult result = vkCreateImage(device->getHandle(), &imageInfo, nullptr, &m_vkDepthImage);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create depth image.");
-	}
-
-	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(device->getHandle(), m_vkDepthImage, &memoryRequirements);
-
-	VkMemoryAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	allocInfo.allocationSize = memoryRequirements.size;
-	allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	result = vkAllocateMemory(device->getHandle(), &allocInfo, nullptr, &m_vkDepthMemory);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to allocate depth device memory.");
-	}
-
-	result = vkBindImageMemory(device->getHandle(), m_vkDepthImage, m_vkDepthMemory, 0);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to bind depth image memory.");
-	}
-
-	VkImageViewCreateInfo imageViewCreateInfo = {};
-	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	imageViewCreateInfo.image = m_vkDepthImage;
-	imageViewCreateInfo.format = format;
-	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-	imageViewCreateInfo.subresourceRange.layerCount = 1;
-	imageViewCreateInfo.subresourceRange.levelCount = 1;
-
-	result = vkCreateImageView(device->getHandle(), &imageViewCreateInfo, nullptr, &m_vkDepthImageView);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create depth image view.");
-	}
+	depth = std::make_shared<Depth>(physicalDevice, device, swapChain);
 }
 
 void Engine::initScene()
@@ -621,62 +532,10 @@ void Engine::updateUniformBufferObject(float deltaSec)
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
 
 		m_uniformBufferObject.view = glm::inverse(translationMat * rotationMat);
-
-
 	}
 
 	m_inputState.mouseXRel = 0;
 	m_inputState.mouseYRel = 0;
-}
-
-
-
-uint32_t Engine::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags)
-{
-	VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice->getHandle(), &deviceMemoryProperties);
-
-	for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; ++i)
-	{
-		if ((typeFilter & (1 << i)) && 
-			(deviceMemoryProperties.memoryTypes[i].propertyFlags & propertyFlags) == propertyFlags)
-		{
-			return i;
-		}
-	}
-
-	throw std::runtime_error("Can't find memory type.");
-}
-
-VkFormat Engine::findSupportedFormat(const std::vector<VkFormat>& candidates,
-	VkImageTiling tiling, VkFormatFeatureFlags features)
-{
-	for (VkFormat format : candidates)
-	{
-		VkFormatProperties properties;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice->getHandle(), format, &properties);
-
-		if ((tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & features) == features) ||
-			(tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & features) == features))
-		{
-			return format;
-		}
-	}
-	
-	throw std::runtime_error("Failed to find supported format.");
-}
-
-VkFormat Engine::findDepthFormat()
-{
-	std::vector<VkFormat> candidates;
-	candidates.push_back(VK_FORMAT_D32_SFLOAT);
-	candidates.push_back(VK_FORMAT_D32_SFLOAT_S8_UINT);
-	candidates.push_back(VK_FORMAT_D24_UNORM_S8_UINT);
-	
-	const VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
-	const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-	return findSupportedFormat(candidates, tiling, features);
 }
 
 bool Engine::hasStencilComponent(VkFormat format)
@@ -887,20 +746,12 @@ void Engine::cleanUp()
 	{
 		vkDestroyFence(device->getHandle(), imagesInFlightFence, nullptr);
 	}
-
-	vkDestroyImageView(device->getHandle(), m_vkDepthImageView, nullptr);
-	vkDestroyImage(device->getHandle(), m_vkDepthImage, nullptr);
-	vkFreeMemory(device->getHandle(), m_vkDepthMemory, nullptr);
-
-	vkDestroyCommandPool(device->getHandle(), m_vkCommandPool, nullptr);
+	
+	depth.reset();
+	commandPool.reset();
 	graphicsPipeline.reset();
 	swapChain.reset();
-
-	for (VkFramebuffer framebuffer : m_vkSwapchainFramebuffers)
-	{
-		vkDestroyFramebuffer(device->getHandle(), framebuffer, nullptr);
-	}
-
+	framebuffer.reset();
 	descriptorSetLayout.reset();
 	vkDestroyDescriptorPool(device->getHandle(), m_vkUniformDescriptorPool, nullptr);
 	vulkanSurface.reset();

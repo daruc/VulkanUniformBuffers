@@ -249,3 +249,38 @@ VkPhysicalDevice PhysicalDevice::getHandle() const
 {
 	return vkPhysicalDevice;
 }
+
+VkFormat PhysicalDevice::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+	VkFormatFeatureFlags features) const
+{
+	for (VkFormat format : candidates)
+	{
+		VkFormatProperties properties;
+		vkGetPhysicalDeviceFormatProperties(vkPhysicalDevice, format, &properties);
+
+		if ((tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & features) == features) ||
+			(tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & features) == features))
+		{
+			return format;
+		}
+	}
+
+	throw std::runtime_error("Failed to find supported format.");
+}
+
+uint32_t PhysicalDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags) const
+{
+	VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+	vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &deviceMemoryProperties);
+
+	for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; ++i)
+	{
+		if ((typeFilter & (1 << i)) &&
+			(deviceMemoryProperties.memoryTypes[i].propertyFlags & propertyFlags) == propertyFlags)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("Can't find memory type.");
+}
