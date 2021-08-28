@@ -16,25 +16,7 @@
 #include "SwapChainSupportDetails.h"
 #include "QueueFamilyIndices.h"
 #include "Vertex.h"
-
-
-struct UniformBufferObject
-{
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 projection;
-};
-
-struct InputState
-{
-	bool forward;
-	bool backward;
-	bool left;
-	bool right;
-	Sint32 mouseXRel;
-	Sint32 mouseYRel;
-	bool mouseRight;
-};
+#include "InputState.h"
 
 
 class VulkanInstance;
@@ -48,6 +30,7 @@ class GraphicsPipeline;
 class Framebuffer;
 class CommandPool;
 class Depth;
+class UniformBuffer;
 
 
 class Engine
@@ -67,6 +50,7 @@ private:
 	std::shared_ptr<Framebuffer> framebuffer;
 	std::shared_ptr<CommandPool> commandPool;
 	std::shared_ptr<Depth> depth;
+	std::shared_ptr<UniformBuffer> uniformBuffer;
 
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
 	std::vector<VkSemaphore> m_vkImageAvailableSemaphores;
@@ -80,14 +64,6 @@ private:
 	std::vector<uint32_t> m_indices;
 	VkBuffer m_vkIndexBuffer;
 	VkDeviceMemory m_vkIndexDeviceMemory;
-	std::vector<VkBuffer> m_vkUniformBuffers;
-	std::vector<VkDeviceMemory> m_vkUniformDeviceMemory;
-
-	glm::vec3 m_viewPosition;
-	glm::vec3 m_viewRotation;
-	UniformBufferObject m_uniformBufferObject;
-	VkDescriptorPool m_vkUniformDescriptorPool;
-	std::vector<VkDescriptorSet> m_vkUniformDescriptorSets;
 
 	std::chrono::high_resolution_clock::time_point m_prevTime;
 	InputState m_inputState;

@@ -17,6 +17,7 @@
 #include "Framebuffer.h"
 #include "CommandPool.h"
 #include "Depth.h"
+#include "UniformBuffer.h"
 
 
 void Engine::initVkInstance()
@@ -66,76 +67,17 @@ void Engine::createFramebuffers()
 
 void Engine::createUniformBuffers()
 {
-	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-	m_vkUniformBuffers.resize(swapChain->initSwapChainImages()->size());
-	m_vkUniformDeviceMemory.resize(swapChain->initSwapChainImages()->size());
-
-	for (size_t i = 0; i < m_vkUniformBuffers.size(); ++i)
-	{
-		const VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		const VkMemoryPropertyFlags memoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		createBuffer(bufferSize, usageFlags, memoryFlags, &m_vkUniformBuffers[i], &m_vkUniformDeviceMemory[i]);
-	}
+	uniformBuffer = std::make_shared<UniformBuffer>(physicalDevice, device, swapChain, descriptorSetLayout);
 }
 
 void Engine::createDescriptorPool()
 {
-	VkDescriptorPoolSize poolSize = {};
-	poolSize.descriptorCount = static_cast<uint32_t>(swapChain->getSwapChainImageViews()->size());
-	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-	VkDescriptorPoolCreateInfo poolCreateInfo = {};
-	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolCreateInfo.poolSizeCount = 1;
-	poolCreateInfo.pPoolSizes = &poolSize;
-	poolCreateInfo.maxSets = static_cast<uint32_t>(swapChain->getSwapChainImageViews()->size());
-
-	VkResult result = vkCreateDescriptorPool(device->getHandle(), &poolCreateInfo, nullptr, &m_vkUniformDescriptorPool);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create descriptor pool for uniform buffer.");
-	}
+	uniformBuffer->createDescriptorPool();
 }
 
 void Engine::createDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> layouts(swapChain->getSwapChainImageViews()->size(), descriptorSetLayout->getHandle());
-
-	VkDescriptorSetAllocateInfo setAllocateInfo = {};
-	setAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	setAllocateInfo.descriptorPool = m_vkUniformDescriptorPool;
-	setAllocateInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
-	setAllocateInfo.pSetLayouts = layouts.data();
-
-	m_vkUniformDescriptorSets.resize(layouts.size());
-
-	VkResult result = vkAllocateDescriptorSets(device->getHandle(), &setAllocateInfo,
-		m_vkUniformDescriptorSets.data());
-
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create descriptor set for uniform buffer.");
-	}
-
-	for (size_t i = 0; i < m_vkUniformBuffers.size(); ++i)
-	{
-		VkDescriptorBufferInfo bufferInfo = {};
-		bufferInfo.buffer = m_vkUniformBuffers[i];
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(UniformBufferObject);
-
-		VkWriteDescriptorSet writeDescriptorSet = {};
-		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = m_vkUniformDescriptorSets[i];
-		writeDescriptorSet.dstBinding = 0;
-		writeDescriptorSet.dstArrayElement = 0;
-		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		writeDescriptorSet.descriptorCount = 1;
-		writeDescriptorSet.pBufferInfo = &bufferInfo;
-
-		vkUpdateDescriptorSets(device->getHandle(), 1, &writeDescriptorSet, 0, nullptr);
-	}
+	uniformBuffer->createDescriptorSets();
 }
 
 void Engine::createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags,
@@ -364,7 +306,7 @@ void Engine::createCommandBuffers()
 		vkCmdBindIndexBuffer(m_vkCommandBuffers[i], m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		vkCmdBindDescriptorSets(m_vkCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->getLayoutHandle(),
-			0, 1, &m_vkUniformDescriptorSets[i], 0, nullptr);
+			0, 1, uniformBuffer->getDescriptorSetHandlePtr(i), 0, nullptr);
 
 		vkCmdDrawIndexed(m_vkCommandBuffers[i], static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 		vkCmdEndRenderPass(m_vkCommandBuffers[i]);
@@ -429,110 +371,17 @@ void Engine::createDepthResources()
 void Engine::initScene()
 {
 	m_prevTime = std::chrono::high_resolution_clock::now();
-	m_uniformBufferObject.model = glm::mat4(1.0f);
-
-	m_viewPosition = { 0.0f, 0.0f, 2.0f };
-	m_viewRotation = { 0.0f, 0.0f, 0.0f };
-
-	glm::mat4 viewTranslationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
-	m_uniformBufferObject.view = glm::inverse(viewTranslationMat);
-
-	float aspectRatio = swapChain->getSwapChainExtent().width / static_cast<float>(swapChain->getSwapChainExtent().height);
-	m_uniformBufferObject.projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
-	m_uniformBufferObject.projection =
-		glm::scale(m_uniformBufferObject.projection, glm::vec3(1.0, -1.0f, 1.0f));
+	uniformBuffer->initScene();
 }
 
 void Engine::updateUniformBuffer(uint32_t imageIndex)
 {
-	void* data;
-	uint32_t memSize = static_cast<uint32_t>(sizeof(UniformBufferObject));
-	vkMapMemory(device->getHandle(), m_vkUniformDeviceMemory[imageIndex], 0.0f, memSize, 0, &data);
-	memcpy(data, &m_uniformBufferObject, memSize);
-	vkUnmapMemory(device->getHandle(), m_vkUniformDeviceMemory[imageIndex]);
+	uniformBuffer->updateUniformBuffer(imageIndex);
 }
 
 void Engine::updateUniformBufferObject(float deltaSec)
 {
-	const float speed = 1.0f;
-	const glm::vec3 xUnit(1.0f, 0.0f, 0.0f);
-	const glm::vec3 yUnit(0.0f, 1.0f, 0.0f);
-	const glm::vec3 zUnit(0.0f, 0.0f, 1.0f);
-
-	if (m_inputState.left)
-	{
-		glm::mat4 viewRotationMat(1.0f);
-
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
-
-		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
-		glm::vec3 translationVec = -rightVec * speed * deltaSec;
-
-		m_viewPosition += translationVec;
-
-		glm::mat4 viewTranslationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
-		m_uniformBufferObject.view = glm::inverse(viewTranslationMat * viewRotationMat);
-	}
-
-	if (m_inputState.right)
-	{
-		glm::mat4 viewRotationMat(1.0f);
-
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
-
-		glm::vec3 rightVec = viewRotationMat * glm::vec4(xUnit, 0.0f);
-		glm::vec3 translationVec = rightVec * speed * deltaSec;
-
-		m_viewPosition += translationVec;
-		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
-	}
-
-	if (m_inputState.forward)
-	{
-		glm::mat4 viewRotationMat(1.0f);
-
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
-
-		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
-		glm::vec3 translationVec = forwardVec * speed * deltaSec;
-
-		m_viewPosition += translationVec;
-		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
-	}
-
-	if (m_inputState.backward)
-	{
-		glm::mat4 viewRotationMat(1.0f);
-
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.y, yUnit);
-		viewRotationMat = glm::rotate(viewRotationMat, m_viewRotation.x, xUnit);
-
-		glm::vec3 forwardVec = viewRotationMat * glm::vec4(-zUnit, 0.0f);
-		glm::vec3 translationVec = -forwardVec * speed * deltaSec;
-
-		m_viewPosition += translationVec;
-		m_uniformBufferObject.view = glm::translate(m_uniformBufferObject.view, -translationVec);
-	}
-
-	if (m_inputState.mouseRight)
-	{
-		const float angleSpeed = 0.01f;
-		float xAngle = -static_cast<float>(m_inputState.mouseYRel) * angleSpeed;
-		float yAngle = -static_cast<float>(m_inputState.mouseXRel) * angleSpeed;
-		m_viewRotation.x += xAngle;
-		m_viewRotation.y += yAngle;
-
-		glm::mat4 rotationMat(1.0f);
-		rotationMat = glm::rotate(rotationMat, m_viewRotation.y, yUnit);
-		rotationMat = glm::rotate(rotationMat, m_viewRotation.x, xUnit);
-
-		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_viewPosition);
-
-		m_uniformBufferObject.view = glm::inverse(translationMat * rotationMat);
-	}
+	uniformBuffer->updateUniformBufferObject(m_inputState, deltaSec);
 
 	m_inputState.mouseXRel = 0;
 	m_inputState.mouseYRel = 0;
@@ -653,6 +502,7 @@ void Engine::update()
 	time_point currentTime = high_resolution_clock::now();
 	float deltaSec = duration<float>(currentTime - m_prevTime).count();
 	m_prevTime = currentTime;
+
 	updateUniformBufferObject(deltaSec);
 }
 
@@ -729,11 +579,7 @@ void Engine::cleanUp()
 	vkDestroyBuffer(device->getHandle(), m_vkIndexBuffer, nullptr);
 	vkFreeMemory(device->getHandle(), m_vkIndexDeviceMemory, nullptr);
 
-	for (size_t i = 0; i < m_vkUniformBuffers.size(); ++i)
-	{
-		vkDestroyBuffer(device->getHandle(), m_vkUniformBuffers[i], nullptr);
-		vkFreeMemory(device->getHandle(), m_vkUniformDeviceMemory[i], nullptr);
-	}
+	uniformBuffer.reset();
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
@@ -753,7 +599,6 @@ void Engine::cleanUp()
 	swapChain.reset();
 	framebuffer.reset();
 	descriptorSetLayout.reset();
-	vkDestroyDescriptorPool(device->getHandle(), m_vkUniformDescriptorPool, nullptr);
 	vulkanSurface.reset();
 	device.reset();
 	vulkanInstance.reset();
