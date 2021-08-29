@@ -31,6 +31,9 @@ class Framebuffer;
 class CommandPool;
 class Depth;
 class UniformBuffer;
+class VertexBuffer;
+class IndexBuffer;
+class CommandBuffer;
 
 
 class Engine
@@ -51,19 +54,15 @@ private:
 	std::shared_ptr<CommandPool> commandPool;
 	std::shared_ptr<Depth> depth;
 	std::shared_ptr<UniformBuffer> uniformBuffer;
+	std::shared_ptr<VertexBuffer> vertexBuffer;
+	std::shared_ptr<IndexBuffer> indexBuffer;
+	std::shared_ptr<CommandBuffer> commandBuffer;
 
-	std::vector<VkCommandBuffer> m_vkCommandBuffers;
 	std::vector<VkSemaphore> m_vkImageAvailableSemaphores;
 	std::vector<VkSemaphore> m_vkRenderFinishedSemaphores;
 	std::vector<VkFence> m_vkFences;
 	std::vector<VkFence> m_vkImagesInFlightFences;
 	int m_currentFrame;
-	std::vector<Vertex> m_vertices;
-	VkBuffer m_vkVertexBuffer;
-	VkDeviceMemory m_vkVertexDeviceMemory;
-	std::vector<uint32_t> m_indices;
-	VkBuffer m_vkIndexBuffer;
-	VkDeviceMemory m_vkIndexDeviceMemory;
 
 	std::chrono::high_resolution_clock::time_point m_prevTime;
 	InputState m_inputState;
@@ -80,11 +79,6 @@ private:
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createDescriptorSets();
-
-	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags,
-		VkBuffer* outBuffer, VkDeviceMemory* outDeviceMemory);
-
-	void copyBuffer(VkDeviceSize size, VkBuffer source, VkBuffer destination);
 
 	void createVertexBuffer();
 	void createIndexBuffer();

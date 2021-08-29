@@ -5,6 +5,7 @@
 
 class Device;
 class PhysicalDevice;
+class CommandPool;
 
 
 class Buffer
@@ -22,6 +23,8 @@ protected:
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags,
 		VkBuffer* outBuffer, VkDeviceMemory* outDeviceMemory);
+
+	void copyBuffer(std::shared_ptr<CommandPool> commandPool, VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffer);
 
 public:
 	Buffer(std::shared_ptr<PhysicalDevice> physicalDevice, std::shared_ptr<Device> device);

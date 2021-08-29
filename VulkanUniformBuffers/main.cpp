@@ -1,5 +1,3 @@
-#define _DISABLE_EXTENDED_ALIGNED_STORAGE
-
 #include <memory>
 #include "Engine.h"
 #include "SdlWindow.h"

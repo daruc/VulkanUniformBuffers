@@ -18,6 +18,9 @@
 #include "CommandPool.h"
 #include "Depth.h"
 #include "UniformBuffer.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
+#include "CommandBuffer.h"
 
 
 void Engine::initVkInstance()
@@ -80,175 +83,14 @@ void Engine::createDescriptorSets()
 	uniformBuffer->createDescriptorSets();
 }
 
-void Engine::createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags,
-	VkBuffer* outBuffer, VkDeviceMemory* outDeviceMemory)
-{
-	VkBufferCreateInfo bufferCreateInfo = {};
-	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.size = size;
-	bufferCreateInfo.usage = usageFlags;
-	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	VkResult result = vkCreateBuffer(device->getHandle(), &bufferCreateInfo, nullptr, outBuffer);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create vertex buffer.");
-	}
-
-	VkMemoryRequirements vertexBufferMemRequirements;
-	vkGetBufferMemoryRequirements(device->getHandle(), *outBuffer, &vertexBufferMemRequirements);
-
-	VkMemoryAllocateInfo memoryAllocateInfo = {};
-	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	memoryAllocateInfo.allocationSize = vertexBufferMemRequirements.size;
-	memoryAllocateInfo.memoryTypeIndex = physicalDevice->findMemoryType(vertexBufferMemRequirements.memoryTypeBits,
-		propertyFlags);
-
-	result = vkAllocateMemory(device->getHandle(), &memoryAllocateInfo, nullptr, outDeviceMemory);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to allocate buffer memory.");
-	}
-
-	vkBindBufferMemory(device->getHandle(), *outBuffer, *outDeviceMemory, 0);
-}
-
-void Engine::copyBuffer(VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffer)
-{
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferAllocateInfo.commandBufferCount = 1;
-	commandBufferAllocateInfo.commandPool = commandPool->getHandle();
-	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-	VkCommandBuffer commandBuffer;
-	vkAllocateCommandBuffers(device->getHandle(), &commandBufferAllocateInfo, &commandBuffer);
-
-	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
-	
-	VkBufferCopy copyRegion = {};
-	copyRegion.size = size;
-
-	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-	vkEndCommandBuffer(commandBuffer);
-
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
-
-	vkQueueSubmit(device->getGraphicsQueueHandle(), 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(device->getGraphicsQueueHandle());
-	vkFreeCommandBuffers(device->getHandle(), commandPool->getHandle(), 1, &commandBuffer);
-}
-
 void Engine::createVertexBuffer()
 {
-	m_vertices.resize(8);
-
-	m_vertices[0].color = { 1.0f, 0.0f, 0.0f };
-	m_vertices[0].position = { -0.5f, -0.5f, 0.5f };
-	
-	m_vertices[1].color = { 0.0f, 1.0f, 0.0f };
-	m_vertices[1].position = { 0.5f, -0.5f, 0.5f };
-	
-	m_vertices[2].color = { 0.0f, 0.0f, 1.0f };
-	m_vertices[2].position = { 0.5f, 0.5f, 0.5f };
-
-	m_vertices[3].color = { 1.0f, 0.0f, 1.0f };
-	m_vertices[3].position = { -0.5f, 0.5f, 0.5f };
-
-	m_vertices[4].color = { 1.0f, 0.0f, 0.0f };
-	m_vertices[4].position = { -0.5f, -0.5f, -0.5f };
-
-	m_vertices[5].color = { 0.0f, 1.0f, 0.0f };
-	m_vertices[5].position = { 0.5f, -0.5f, -0.5f };
-
-	m_vertices[6].color = { 0.0f, 0.0f, 1.0f };
-	m_vertices[6].position = { 0.5f, 0.5f, -0.5f };
-
-	m_vertices[7].color = { 1.0f, 0.0f, 1.0f };
-	m_vertices[7].position = { -0.5f, 0.5f, -0.5f };
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-
-	const VkDeviceSize bufferSize = sizeof(Vertex) * m_vertices.size();
-	const VkBufferUsageFlags stagingBufferUsageFlags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	const VkMemoryPropertyFlags stagingMemPropertyFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-	createBuffer(bufferSize, stagingBufferUsageFlags, stagingMemPropertyFlags,
-		&stagingBuffer, &stagingMemory);
-
-	void* mappedMemory;
-	VkResult result = vkMapMemory(device->getHandle(), stagingMemory, 0, bufferSize, 0, &mappedMemory);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to map vertex memory.");
-	}
-
-	memcpy(mappedMemory, m_vertices.data(), bufferSize);
-	vkUnmapMemory(device->getHandle(), stagingMemory);
-
-	const VkBufferUsageFlags vertexBufferUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	const VkMemoryPropertyFlags vertexMemPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-	createBuffer(bufferSize, vertexBufferUsageFlags, vertexMemPropertyFlags, &m_vkVertexBuffer,
-		&m_vkVertexDeviceMemory);
-
-	copyBuffer(bufferSize, stagingBuffer, m_vkVertexBuffer);
-
-	vkDestroyBuffer(device->getHandle(), stagingBuffer, nullptr);
-	vkFreeMemory(device->getHandle(), stagingMemory, nullptr);
+	vertexBuffer = std::make_shared<VertexBuffer>(physicalDevice, device, commandPool);
 }
 
 void Engine::createIndexBuffer()
 {
-	m_indices = { 0, 1, 2, 0, 2, 3, // front
-				7, 6, 4, 6, 5, 4, // back
-				1, 5, 6, 1, 6, 2,	// right
-				4, 0, 3, 4, 3, 7,	// left
-				4, 5, 1, 4, 1, 0,	// top
-				2, 6, 7, 2, 7, 3	// bottom
-	};
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-
-	const VkDeviceSize bufferSize = sizeof(uint32_t) * m_indices.size();
-	const VkBufferUsageFlags stagingBufferUsageFlags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	const VkMemoryPropertyFlags stagingMemPropertyFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-	createBuffer(bufferSize, stagingBufferUsageFlags, stagingMemPropertyFlags,
-		&stagingBuffer, &stagingMemory);
-
-	void* mappedMemory;
-	VkResult result = vkMapMemory(device->getHandle(), stagingMemory, 0, bufferSize, 0, &mappedMemory);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to map index memory.");
-	}
-
-	memcpy(mappedMemory, m_indices.data(), bufferSize);
-	vkUnmapMemory(device->getHandle(), stagingMemory);
-
-	const VkBufferUsageFlags indexBufferUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	const VkMemoryPropertyFlags indexMemPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-	createBuffer(bufferSize, indexBufferUsageFlags, indexMemPropertyFlags, &m_vkIndexBuffer,
-		&m_vkIndexDeviceMemory);
-
-	copyBuffer(bufferSize, stagingBuffer, m_vkIndexBuffer);
-
-	vkDestroyBuffer(device->getHandle(), stagingBuffer, nullptr);
-	vkFreeMemory(device->getHandle(), stagingMemory, nullptr);
+	indexBuffer = std::make_shared<IndexBuffer>(physicalDevice, device, commandPool);
 }
 
 void Engine::createCommandPool()
@@ -258,65 +100,8 @@ void Engine::createCommandPool()
 
 void Engine::createCommandBuffers()
 {
-	m_vkCommandBuffers.resize(framebuffer->getCount());
-
-	VkCommandBufferAllocateInfo commandBufferInfo = {};
-	commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferInfo.commandPool = commandPool->getHandle();
-	commandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	commandBufferInfo.commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers.size());
-
-	VkResult result = vkAllocateCommandBuffers(device->getHandle(), &commandBufferInfo, m_vkCommandBuffers.data());
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to allocate command buffers.");
-	}
-
-	for (size_t i = 0; i < m_vkCommandBuffers.size(); ++i)
-	{
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		
-		result = vkBeginCommandBuffer(m_vkCommandBuffers[i], &beginInfo);
-		if (result != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to begin command buffer.");
-		}
-
-		VkRenderPassBeginInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = renderPass->getHandle();
-		renderPassInfo.framebuffer = framebuffer->getHandle(i);
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = swapChain->getSwapChainExtent();
-
-		std::array<VkClearValue, 2> clearValues;
-		clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		clearValues[1] = { 1.0f, 0 };
-
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-		renderPassInfo.pClearValues = clearValues.data();
-
-		vkCmdBeginRenderPass(m_vkCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(m_vkCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->getHandle());
-
-		VkBuffer buffers[] = { m_vkVertexBuffer };
-		VkDeviceSize bufferOffsets[] = { 0 };
-		vkCmdBindVertexBuffers(m_vkCommandBuffers[i], 0, 1, buffers, bufferOffsets);
-		vkCmdBindIndexBuffer(m_vkCommandBuffers[i], m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-		vkCmdBindDescriptorSets(m_vkCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->getLayoutHandle(),
-			0, 1, uniformBuffer->getDescriptorSetHandlePtr(i), 0, nullptr);
-
-		vkCmdDrawIndexed(m_vkCommandBuffers[i], static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
-		vkCmdEndRenderPass(m_vkCommandBuffers[i]);
-
-		result = vkEndCommandBuffer(m_vkCommandBuffers[i]);
-		if (result != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to record command buffer.");
-		}
-	}
+	commandBuffer = std::make_shared<CommandBuffer>(device, renderPass, framebuffer, commandPool, swapChain, 
+		graphicsPipeline, vertexBuffer, indexBuffer, uniformBuffer);
 }
 
 void Engine::createSemaphores()
@@ -536,7 +321,7 @@ void Engine::render()
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &m_vkCommandBuffers[imageIndex];
+	submitInfo.pCommandBuffers = commandBuffer->getHandlePtr(imageIndex);
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -573,12 +358,8 @@ void Engine::cleanUp()
 {
 	vkDeviceWaitIdle(device->getHandle());
 
-	vkDestroyBuffer(device->getHandle(), m_vkVertexBuffer, nullptr);
-	vkFreeMemory(device->getHandle(), m_vkVertexDeviceMemory, nullptr);
-
-	vkDestroyBuffer(device->getHandle(), m_vkIndexBuffer, nullptr);
-	vkFreeMemory(device->getHandle(), m_vkIndexDeviceMemory, nullptr);
-
+	vertexBuffer.reset();
+	indexBuffer.reset();
 	uniformBuffer.reset();
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)

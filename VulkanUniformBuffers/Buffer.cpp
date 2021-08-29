@@ -1,6 +1,7 @@
 #include "Buffer.h"
 #include "Device.h"
 #include "PhysicalDevice.h"
+#include "CommandPool.h"
 #include <stdexcept>
 
 
@@ -51,5 +52,37 @@ void Buffer::throwIfAllocateMemoryFailed(VkResult result) const
 	{
 		throw std::runtime_error("Failed to allocate buffer memory.");
 	}
+}
 
+void Buffer::copyBuffer(std::shared_ptr<CommandPool> commandPool, VkDeviceSize size, VkBuffer srcBuffer, VkBuffer dstBuffer)
+{
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocateInfo.commandBufferCount = 1;
+	commandBufferAllocateInfo.commandPool = commandPool->getHandle();
+	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(device->getHandle(), &commandBufferAllocateInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.size = size;
+
+	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vkQueueSubmit(device->getGraphicsQueueHandle(), 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(device->getGraphicsQueueHandle());
+	vkFreeCommandBuffers(device->getHandle(), commandPool->getHandle(), 1, &commandBuffer);
 }
